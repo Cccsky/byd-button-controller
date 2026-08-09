@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">比亚迪按键映射</string>
+    <string name="accessibility_service_label">方向盘按键映射</string>
+    <string name="accessibility_service_description">捕获方向盘按键，执行音乐播放/暂停与 360 影像视角切换。需要此权限才能全局拦截按键并自动点击 360 界面的视角按钮。</string>
+</resources>

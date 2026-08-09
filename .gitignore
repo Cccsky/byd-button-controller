@@ -1,0 +1,31 @@
+# Gradle / Android 构建产物
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+
+# 本机配置（含 SDK 路径，勿提交）
+local.properties
+*.iml
+.idea/
+.DS_Store
+
+# 本地 AI 工具配置
+.claude/
+.codex/
+.agents/
+
+# 密钥与敏感文件
+*.keystore
+*.jks
+adbkey
+adbkey.pub
+*.pk8
+*.x509
+
+# 日志
+*.log
