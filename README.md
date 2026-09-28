@@ -12,6 +12,10 @@
 > ✅ 2026-08-07 实车验证：**App 内置无线 ADB 客户端**，重启后无障碍授权丢失可自动修复，
 > 全程无需电脑（首次需在车机弹窗点一次「始终允许」）。已兼容 DiLink 定制 adbd 的
 > 特殊签名校验（DigestInfo 哈希=token，非标准 SHA1withRSA）。
+>
+> ✅ 2026-09-28 授权机制升级：一次性获得 `WRITE_SECURE_SETTINGS` 权限后，App 直接写
+> 系统安全设置恢复无障碍授权，不再依赖 ADB 握手（内嵌 ADB 仅用于首次获取该权限，
+> 保留为兜底链路并加重试）。同版更新 App 图标与界面。
 
 ---
 
@@ -72,59 +76,60 @@ gradle assembleDebug --no-daemon --console=plain
 安装到车机：
 
 ```bash
-adb connect 192.168.250.81:5555
-adb -s 192.168.250.81:5555 install -r app/build/outputs/apk/debug/app-debug.apk
-# 开启无障碍服务（已装时可跳过）：
-adb -s 192.168.250.81:5555 shell settings put secure enabled_accessibility_services \
+adb connect 10.43.22.81:5555
+adb -s 10.43.22.81:5555 install -r app/build/outputs/apk/debug/app-debug.apk
+# 关键一步：授予「写入安全设置」权限（持久有效，之后 App 可自行恢复无障碍授权）
+adb -s 10.43.22.81:5555 shell pm grant com.byd.buttoncontroller android.permission.WRITE_SECURE_SETTINGS
+# 开启无障碍服务（授予上面权限后，App 也能自己完成这一步）
+adb -s 10.43.22.81:5555 shell settings put secure enabled_accessibility_services \
   "<现有值>:com.byd.buttoncontroller/.service.KeyMapAccessibilityService"
-adb -s 192.168.250.81:5555 shell settings put secure accessibility_enabled 1
+adb -s 10.43.22.81:5555 shell settings put secure accessibility_enabled 1
 ```
 
 ## 使用步骤
 
-1. 安装 APK 到车机。
-2. 在系统设置里启用「方向盘按键映射」无障碍服务（主界面或「授权助手」有跳转按钮）。
+1. 安装 APK 到车机，执行一次上面的 `pm grant`（或在「授权助手」点「自动获取权限」）。
+2. 无障碍服务：拿到写安全设置权限后 App 可自行开启；也可在系统设置手动启用。
 3. 若 DiLink 有自启动管理，放行本 App（「授权助手」有一键跳转）。
 4. 主界面按需开关各映射（M1 模式键默认关闭）。
 
 ## 授权助手（App 内集成）
 
-主界面右上角菜单 →「授权助手」，提供：
+主界面右上角菜单 →「授权助手」，核心是「① 自动授权权限（只需做一次）」：
 
-- **状态检测**：ADB 网络调试（5555 端口自探测）、无障碍服务、通知使用权、自启动管理入口。
-- **复制 ADB 授权命令**：自动获取车机 IP、读取当前无障碍授权状态，生成完整可执行的
-  adb 命令，一键复制后到电脑终端粘贴运行即可完成「连接车机 + 安装 + 授权」。
-- **导出 APK**：把当前安装包导出到车机 `/sdcard/Download/`，之后授权命令可改用车机端
-  安装（电脑上无需再准备 APK 文件），适合分发到其它车。
+- **自动获取权限**：App 内嵌无线 ADB 客户端连接车机自身，执行一次
+  `pm grant ... WRITE_SECURE_SETTINGS`（车机弹窗勾选「始终允许」即可）。
+- **复制电脑命令**：自动获取车机 IP 生成两条命令，内嵌 ADB 失败时在电脑执行一次即可。
+- 附加：无障碍一键修复、通知使用权（可选 M1）、自启动管理入口。
 
-> ⚠️ 说明：车机上的 App 无法自行执行 adb（无 root），首次授权必须由电脑执行一次。
-> 授权助手负责把命令和状态准备好；也可用仓库根目录的一键脚本代替手动操作：
+> 也可用仓库根目录的一键脚本代替手动操作（含安装 + pm grant + 开无障碍）：
 
 ```bash
-./deploy.sh                    # 默认连接 192.168.250.81:5555
-./deploy.sh <车机IP> <APK路径>   # 指定 IP 与本地 APK
+./deploy.sh <车机IP> [APK路径]
 ```
-
 
 ## 重启后无障碍授权丢失怎么办（App 内自动修复）
 
 实车问题：**DiLink 车机重启会清除第三方 App（非预装）的无障碍授权**，表现为每次重启后
 方向盘映射失效，需要重新授权。
 
-**解决方案（2026-08-07 实车验证）：App 内置无线 ADB 客户端，自动连接车机自身完成授权修复，无需电脑。**
+**解决方案（2026-09-28 升级并实车验证）：App 一次性获得 WRITE_SECURE_SETTINGS 权限后，
+直接写系统安全设置恢复授权——不再依赖 ADB 握手，秒级、无弹窗、重启同样生效。**
 
-原理：
-- App 内嵌轻量 ADB 客户端（`util/AdbAuth.kt`），开机后（`BootReceiver` 延迟 12 秒）检测
-  无障碍授权是否丢失；丢失则用车机自身局域网 IP:5555 连接 adbd，执行
-  `settings put secure enabled_accessibility_services ...` 自动恢复。
-- 也可以在「授权助手」里点「检测并修复授权」一键修复。
+修复链路（按优先级，见 `util/AuthRepairer.kt`）：
+1. 已持有 `WRITE_SECURE_SETTINGS`（`pm grant` 一次即永久持有）→ 直接
+   `Settings.Secure` 写入无障碍服务列表并轮询服务绑定（纯本地，无网络依赖）；
+2. 未持有时 → 内嵌 ADB 客户端（`util/AdbAuth.kt`）执行一次性 `pm grant`；
+3. ADB 兜底 → 仍可用 shell 直接写设置（老链路，带 3 次重试）。
 
-首次使用（只需一次）：
-1. 保证车机已开启「ADB 网络调试」（开发者选项，授权助手可检测 5555 端口）。
-2. 点击「授权助手 - 检测并修复授权」；车机弹出「允许调试」时**勾选「始终允许」并点允许**。
-3. 之后 key 持久化在车机 `/data/misc/adb/adb_keys`，重启后 App 免弹窗自动修复。
+触发时机：开机广播（`BootReceiver`，延迟 12 秒）+ 保活服务每 60 秒守护 + 主界面/
+授权助手手动「一键修复」。
 
-技术要点（DiLink 定制 adbd 兼容，均实车验证）：
+首次使用（只需一次，二选一）：
+1. 车机上：「授权助手 - 自动获取权限」，车机弹「允许调试」时**勾选「始终允许」并点允许**；
+2. 电脑上：`adb shell pm grant com.byd.buttoncontroller android.permission.WRITE_SECURE_SETTINGS`。
+
+内嵌 ADB 的技术要点（DiLink 定制 adbd 兼容，均实车验证）：
 - **签名**：车机 adbd 校验 SIGNATURE 时直接取 DigestInfo 哈希字段与 token 对比（不再重新
   SHA1），因此签名 = `DigestInfo(哈希=token) + RSA 私钥加密(PKCS1)`，**不是**标准 SHA1withRSA。
 - **公钥**：RSAPUBLICKEY 必须用 android_pubkey 编码（524 字节），openssh 格式会被
@@ -133,7 +138,7 @@ adb -s 192.168.250.81:5555 shell settings put secure accessibility_enabled 1
 - **一次性 shell**：执行命令用 `shell:<cmd>` 而非交互式 shell（交互式不自动退出会超时）。
 
 前提：App 需要加入自启动白名单（车机「自启动管理」→ 允许本 App），否则开机广播收不到、
-无法自动修复（可手动点「检测并修复授权」）。
+无法开机自动修复（保活服务的 60 秒守护与手动「一键修复」不受影响）。
 
 备选（电脑手动恢复）：
 ```bash

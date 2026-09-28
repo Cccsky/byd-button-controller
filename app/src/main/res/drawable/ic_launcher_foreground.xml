@@ -1,9 +1,46 @@
+<!-- App 图标前景：方向盘 + 三个映射按键点（红），108dp 自适应图标画布 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+
+    <!-- 轮辋 -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M54,30 L54,78 M30,54 L78,54" />
+        android:pathData="M54,28 a26,26 0 1,1 -0.01,0 Z"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.5"
+        android:fillColor="#00000000" />
+
+    <!-- 横向辐条 -->
+    <path
+        android:pathData="M33,54 L75,54"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 下方辐条 -->
+    <path
+        android:pathData="M54,61.5 L54,76.5"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="5.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+
+    <!-- 中心轮毂 -->
+    <path
+        android:pathData="M54,46 a8,8 0 1,1 -0.01,0 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- 三个被映射的按键点（BYD 红） -->
+    <path
+        android:pathData="M38,50.8 a3.2,3.2 0 1,1 -0.01,0 Z"
+        android:fillColor="#E60012" />
+    <path
+        android:pathData="M54,50.8 a3.2,3.2 0 1,1 -0.01,0 Z"
+        android:fillColor="#E60012" />
+    <path
+        android:pathData="M70,50.8 a3.2,3.2 0 1,1 -0.01,0 Z"
+        android:fillColor="#E60012" />
 </vector>

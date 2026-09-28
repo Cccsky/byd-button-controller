@@ -6,15 +6,15 @@ import java.net.NetworkInterface
 import java.net.Socket
 
 /**
- * ADB 授权相关辅助：本机 IP 获取、5555 端口探测、授权命令生成。
+ * ADB 授权相关辅助：本机 IP 获取、5555 端口探测、电脑端授权命令生成。
  *
- * 说明：车机上的普通 App 无法执行 adb，首次授权必须由电脑执行一次。
- * 本工具用于：检测车机是否已开启 ADB 网络调试、生成可粘贴到电脑的授权命令。
+ * 自动授权机制：App 持有 WRITE_SECURE_SETTINGS 后可自行恢复无障碍授权；
+ * 该权限用 adb 执行一次 `pm grant` 即可获得（App 内嵌 ADB 自动做，
+ * 失败时用这里生成的命令在电脑上手动执行一次）。
  */
 object AdbHelper {
 
     const val ADB_PORT = 5555
-    const val ACCESSIBILITY_SERVICE = "com.byd.buttoncontroller/.service.KeyMapAccessibilityService"
     const val PACKAGE_NAME = "com.byd.buttoncontroller"
 
     /** 获取本机所有非回环 IPv4 地址（车机可能有多个网卡）。 */
@@ -49,36 +49,16 @@ object AdbHelper {
     }
 
     /**
-     * 生成可在电脑上直接执行的授权命令（仅可执行行，Windows/Mac 通用）。
-     *
-     * @param ip              车机 IP（用于 adb connect）
-     * @param enabledServices 车机当前已开启的无障碍服务列表（原始字符串，可为空）
-     * @param apkOnDevice     若已在车机 Download 导出 APK，填其路径（如
-     *                        /sdcard/Download/byd-button-controller.apk），
-     *                        则安装命令改用车机端安装；否则用电脑端路径占位符
+     * 生成电脑端一次性授权命令（Windows/Mac 通用，仅可执行行）。
+     * 核心是 pm grant 授予写安全设置权限；若该命令不被支持，附兼容的无障碍直写命令。
      */
-    fun buildGrantCommands(ip: String, enabledServices: String?, apkOnDevice: String?): String {
+    fun buildPcGrantCommand(ip: String): String {
         val sb = StringBuilder()
         sb.append("adb connect $ip:5555\n")
-        sb.append("adb -s $ip:5555 wait-for-device\n")
-
-        if (apkOnDevice != null) {
-            // APK 已在车机 Download 目录：车机端直接安装（电脑上无需 APK 文件）
-            sb.append("adb -s $ip:5555 shell pm install -r \"$apkOnDevice\"\n")
-        } else {
-            // 需要电脑上有 APK：占位符，用户替换为实际路径
-            sb.append("adb -s $ip:5555 install -r \"<电脑上 APK 的完整路径>\"\n")
-        }
-
-        val cur = enabledServices?.trim().orEmpty()
-        val alreadyGranted = cur.contains(PACKAGE_NAME)
-        if (!alreadyGranted) {
-            val newVal = if (cur.isEmpty()) ACCESSIBILITY_SERVICE else "$cur:$ACCESSIBILITY_SERVICE"
-            sb.append("adb -s $ip:5555 shell settings put secure enabled_accessibility_services \"$newVal\"\n")
-            sb.append("adb -s $ip:5555 shell settings put secure accessibility_enabled 1\n")
-        }
-
-        sb.append("adb -s $ip:5555 shell dumpsys accessibility | grep byd\n")
+        sb.append("adb -s $ip:5555 shell pm grant $PACKAGE_NAME ${SecureSettingsWriter.PERMISSION}\n")
+        sb.append("# 若上一行报错（老系统不支持），改用兼容命令直接开无障碍：\n")
+        sb.append("# adb -s $ip:5555 shell settings put secure enabled_accessibility_services \"${AuthRepairer.SERVICE_COMPONENT}\"\n")
+        sb.append("# adb -s $ip:5555 shell settings put secure accessibility_enabled 1\n")
         return sb.toString()
     }
 }

@@ -24,8 +24,7 @@
             android:orientation="vertical"
             android:padding="16dp">
 
-
-            <!-- 无线 ADB 自授权 -->
+            <!-- ======== 第一步：自动授权权限 ======== -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -41,22 +40,22 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="无线 ADB 自授权（一键修复）"
+                        android:text="① 自动授权权限（核心，只需做一次）"
                         android:textStyle="bold" />
 
                     <TextView
-                        android:id="@+id/txtAdbAuthStatus"
+                        android:id="@+id/txtGrantStatus"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="App 内置 ADB 客户端，自动连接车机自身完成授权修复，无需电脑。
-首次使用请在车机弹窗点一次「允许」，之后重启自动修复。"
+                        android:text="检测中…"
                         android:textColor="?android:attr/textColorSecondary"
                         android:textSize="13sp" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
                         android:orientation="horizontal">
 
                         <com.google.android.material.button.MaterialButton
@@ -65,27 +64,39 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="检测并修复授权" />
+                            android:text="自动获取权限" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnResetAdbKey"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="wrap_content"
+                            android:id="@+id/btnCopyCommands"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="8dp"
-                            android:text="重置密钥" />
+                            android:layout_weight="1"
+                            android:text="复制电脑命令" />
 
                     </LinearLayout>
 
+                    <TextView
+                        android:id="@+id/txtAdbAuthStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:text="点击「自动获取权限」后，若车机弹出「允许调试」请勾选一律允许并确认；失败时把电脑命令发给有电脑的人执行一次即可。"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="12sp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnResetAdbKey"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="高级：重置 ADB 密钥" />
+
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- ======== 状态检测 ======== -->
-            <TextView
-                style="@style/SettingsSectionTitle"
-                android:text="状态检测" />
-
-            <!-- ADB 网络调试 -->
+            <!-- ======== 第二步：无障碍服务 ======== -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -101,47 +112,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="ADB 网络调试（5555 端口）"
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/txtAdbStatus"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="检测中…"
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:textSize="13sp" />
-
-                    <TextView
-                        android:id="@+id/txtIpList"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:text=""
-                        android:textColor="?android:attr/textColorSecondary"
-                        android:textSize="13sp" />
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <!-- 无障碍服务 -->
-            <com.google.android.material.card.MaterialCardView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                app:cardCornerRadius="10dp">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:padding="14dp">
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:text="无障碍服务（方向盘按键映射）"
+                        android:text="② 无障碍服务（方向盘按键映射）"
                         android:textStyle="bold" />
 
                     <TextView
@@ -153,18 +124,34 @@
                         android:textColor="?android:attr/textColorSecondary"
                         android:textSize="13sp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnOpenAccessibility"
-                        style="@style/Widget.Material3.Button.TonalButton"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="8dp"
-                        android:text="去开启无障碍服务" />
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnRepair"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="一键修复授权" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnOpenAccessibility"
+                            style="@style/Widget.Material3.Button.TonalButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="8dp"
+                            android:layout_weight="1"
+                            android:text="去系统设置" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 通知使用权 -->
+            <!-- ======== 可选：通知使用权 ======== -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -180,7 +167,7 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="通知使用权（M1 播放/暂停备用）"
+                        android:text="可选：通知使用权（M1 播放/暂停）"
                         android:textStyle="bold" />
 
                     <TextView
@@ -203,7 +190,7 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- 自启动管理 -->
+            <!-- ======== 自启动管理 ======== -->
             <com.google.android.material.card.MaterialCardView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -219,14 +206,14 @@
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="DiLink 自启动管理"
+                        android:text="DiLink 自启动管理（防杀后台）"
                         android:textStyle="bold" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="必做：DiLink 重启会清除第三方 App 的无障碍授权。把本 App 加入自启动白名单后，开机可自动检测并弹通知一键修复；否则每次重启都需重新授权。"
+                        android:text="建议：把本 App 加入自启动白名单，开机后才能自动检测并静默恢复授权。"
                         android:textColor="?android:attr/textColorSecondary"
                         android:textSize="13sp" />
 
@@ -240,90 +227,6 @@
 
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
-
-            <!-- ======== 复制授权命令 ======== -->
-            <TextView
-                style="@style/SettingsSectionTitle"
-                android:layout_marginTop="16dp"
-                android:text="复制 ADB 授权命令" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:text="首次安装/换车机时，需在【电脑】上执行一次 adb 授权。命令已自动填入车机 IP 与当前授权状态，复制后在电脑终端粘贴运行即可。"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:hint="授权命令（可编辑后复制）">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/editCommands"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:gravity="top|start"
-                    android:inputType="textMultiLine"
-                    android:minLines="8"
-                    android:scrollbars="vertical"
-                    android:textIsSelectable="true"
-                    android:typeface="monospace" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRefreshCommands"
-                    style="@style/Widget.Material3.Button.TonalButton"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="刷新命令" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnCopyCommands"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
-                    android:layout_weight="1"
-                    android:text="复制命令" />
-
-            </LinearLayout>
-
-            <!-- ======== 导出 APK ======== -->
-            <TextView
-                style="@style/SettingsSectionTitle"
-                android:layout_marginTop="16dp"
-                android:text="导出 APK（分发/换车用）" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginBottom="6dp"
-                android:text="把当前 App 的安装包导出到车机 Download 目录，之后命令可直接用车机端安装（电脑上无需再准备 APK）。"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnExportApk"
-                style="@style/Widget.Material3.Button.TonalButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="导出 APK 到 Download" />
-
-            <TextView
-                android:id="@+id/txtExportStatus"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:text=""
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
 
         </LinearLayout>
     </ScrollView>

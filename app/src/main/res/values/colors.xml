@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <!-- BYD 主题色：深红主色 + 品牌红点缀 + 深夜蓝图标底 -->
+    <color name="byd_red_500">#C62828</color>
+    <color name="byd_red_700">#8E0000</color>
+    <color name="byd_red_bright">#E60012</color>
+    <color name="byd_navy">#111827</color>
+    <color name="byd_steel">#455A64</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 </resources>

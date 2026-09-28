@@ -1,5 +1,6 @@
 package com.byd.buttoncontroller.util
 
+import android.content.ComponentName
 import android.content.Context
 import com.byd.buttoncontroller.service.KeyMapAccessibilityService
 import java.io.File
@@ -9,12 +10,14 @@ import java.net.Socket
 /**
  * 无障碍授权自动修复器。
  *
- * 原理：App 内置轻量 ADB 客户端（[AdbAuth]），通过无线 ADB 连接车机自身
- * （本机局域网 IP:5555，实测车机 adbd 不监听 127.0.0.1 回环），认证后用 shell
- * 重新写入无障碍授权设置——解决 DiLink 车机重启清除第三方 App 无障碍授权的问题。
+ * 修复链路（按优先级）：
+ * 1. [SecureSettingsWriter]：已持有 WRITE_SECURE_SETTINGS 时直接写系统设置，
+ *    纯本地操作、秒级完成，重启丢授权后由保活/开机广播静默恢复；
+ * 2. 内嵌 ADB（[AdbAuth]）执行一次性 `pm grant` 获取上述权限（首次需车机弹窗点允许），
+ *    授权成功后以后都走链路 1；
+ * 3. ADB 兼容兜底：直接用 shell 写无障碍设置（老链路，偶发失败时自动重试）。
  *
- * 首次使用：需在车机弹窗点一次「允许」（key 持久化后免确认）；
- * 之后开机检测到授权丢失会自动静默修复，全程无需电脑。
+ * 三条链路都失败时，结果消息里会带上可在电脑执行的一条命令，手动救回。
  */
 object AuthRepairer {
 
@@ -43,18 +46,57 @@ object AuthRepairer {
 
     /**
      * 执行授权修复。
-     * @return 结果（ok=true 表示授权已恢复）
+     * @return 结果（ok=true 表示无障碍服务已开启/已写入生效）
      */
     fun repair(context: Context): Result {
-        // 已授权则无需修复
+        val service = ComponentName(context, KeyMapAccessibilityService::class.java)
+
         if (AccessibilityUtil.isServiceEnabled(context, KeyMapAccessibilityService::class.java)) {
             return Result(true, "无障碍服务已开启，无需修复")
         }
-        val host = findAdbHost()
-        if (host == null) {
-            return Result(false, "车机 ADB 5555 端口未开放，无法自修复。\n请在开发者选项开启「ADB 网络调试」")
+
+        // 链路 1：已持有写安全设置权限 -> 直接写 + 轮询验证
+        if (SecureSettingsWriter.hasPermission(context)) {
+            AppLog.i("授权修复: 持有 WRITE_SECURE_SETTINGS，直接写入")
+            val ok = writeAndVerify(context, service)
+            if (ok) return Result(true, "授权已恢复 ✓")
+            AppLog.w("直接写入未生效，转 ADB 兜底")
         }
-        AppLog.i("ADB 自修复: 使用本机 IP $host")
+
+        // 链路 2/3：内嵌 ADB
+        return repairViaAdb(context, service)
+    }
+
+    /** 链路 1：直接写安全设置并轮询服务绑定（最多约 5 秒）。 */
+    private fun writeAndVerify(context: Context, service: ComponentName): Boolean {
+        if (!SecureSettingsWriter.writeAccessibilityService(context, service)) return false
+        repeat(VERIFY_TIMES) {
+            if (AccessibilityUtil.isServiceEnabled(context, KeyMapAccessibilityService::class.java)) {
+                AppLog.i("无障碍服务已绑定生效")
+                return true
+            }
+            Thread.sleep(VERIFY_INTERVAL_MS)
+        }
+        // 绑定稍慢但设置已写入：只要设置里有本服务即视为成功（服务随后由系统拉起）
+        val cur = try {
+            android.provider.Settings.Secure.getString(
+                context.contentResolver,
+                android.provider.Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            ).orEmpty()
+        } catch (t: Throwable) {
+            ""
+        }
+        val written = SecureSettingsWriter.listContains(cur, service)
+        if (written) AppLog.i("设置已写入，服务绑定稍有延迟")
+        return written
+    }
+
+    /** 链路 2/3：通过内嵌 ADB 先做一次性 pm grant，失败再用 shell 直接写。 */
+    private fun repairViaAdb(context: Context, service: ComponentName): Result {
+        val host = findAdbHost()
+            ?: return Result(false, "车机 ADB 5555 端口未开放，无法自动修复。" +
+                    "\n可在开发者选项开启「ADB 网络调试」，或在电脑执行一次授权命令")
+        AppLog.i("ADB 修复: 使用本机 IP $host")
 
         val kp = try {
             AdbAuth.loadOrCreateKeyPair(File(context.filesDir, "adbkey"))
@@ -63,31 +105,65 @@ object AuthRepairer {
             return Result(false, "ADB 密钥生成失败: ${t.message}")
         }
 
-        return try {
-            val cur = AdbAuth.execShell(host, AdbAuth.ADB_PORT, kp,
+        // 链路 2：一次性 pm grant（授予后持久有效，以后修复都走链路 1）
+        try {
+            adbExecRetry(host, kp, "pm grant $PACKAGE ${SecureSettingsWriter.PERMISSION}")
+            AppLog.i("已通过 ADB 授予 WRITE_SECURE_SETTINGS")
+            if (SecureSettingsWriter.hasPermission(context)) {
+                if (writeAndVerify(context, service)) {
+                    return Result(true, "已获得写安全设置权限，授权已恢复 ✓\n以后重启会自动静默恢复，无需再弹窗")
+                }
+            }
+        } catch (t: Throwable) {
+            AppLog.w("pm grant 失败（首次授权需在车机弹窗点允许）: ${t.message}")
+        }
+
+        // 链路 3：兼容兜底——shell 直接写设置（重试 2 次）
+        try {
+            val cur = adbExecRetry(host, kp,
                 "settings get secure enabled_accessibility_services").trim()
             AppLog.i("ADB 读取当前无障碍设置: [$cur]")
-
-            val already = cur.contains(PACKAGE)
-            if (!already) {
+            if (!cur.contains(PACKAGE)) {
                 val newVal = if (cur.isEmpty()) SERVICE_COMPONENT else "$cur:$SERVICE_COMPONENT"
-                AdbAuth.execShell(host, AdbAuth.ADB_PORT, kp,
-                    "settings put secure enabled_accessibility_services \"$newVal\"")
-                AdbAuth.execShell(host, AdbAuth.ADB_PORT, kp,
-                    "settings put secure accessibility_enabled 1")
+                var written = false
+                repeat(2) {
+                    adbExecRetry(host, kp,
+                        "settings put secure enabled_accessibility_services \"$newVal\"")
+                    adbExecRetry(host, kp, "settings put secure accessibility_enabled 1")
+                    val back = adbExecRetry(host, kp,
+                        "settings get secure enabled_accessibility_services").trim()
+                    written = back.contains(PACKAGE)
+                    if (written) return@repeat
+                    Thread.sleep(600)
+                }
+                if (!written) return Result(false, "已写入但读回校验失败（偶发），请重试一次")
                 AppLog.i("已通过 ADB 写入无障碍授权: $newVal")
             }
-
-            // 验证（读回设置确认，服务绑定可能有延迟）
-            Thread.sleep(1200)
-            val verify = AdbAuth.execShell(host, AdbAuth.ADB_PORT, kp,
-                "settings get secure enabled_accessibility_services").trim()
-            val ok = verify.contains(PACKAGE)
-            if (ok) AppLog.i("授权修复完成，当前: $verify")
-            Result(ok, if (ok) "授权已自动恢复 ✓" else "已写入但未生效，请重试")
+            return Result(true, "授权已恢复 ✓（ADB 兜底链路）\n建议重试「自动获取权限」以获得永久自动修复")
         } catch (t: Throwable) {
             AppLog.e("自动修复授权失败", t)
-            Result(false, t.message ?: "修复失败")
+            return Result(false, "自动修复失败: ${t.message}" +
+                    "\n备用方案：在电脑执行授权助手页的「电脑授权命令」")
         }
     }
+
+    /** shell 命令带重试（偶发认证/连接失败时自动重连）。 */
+    private fun adbExecRetry(host: String, kp: java.security.KeyPair, command: String): String {
+        var last: Throwable? = null
+        repeat(ADB_RETRY_TIMES) { i ->
+            try {
+                return AdbAuth.execShell(host, AdbAuth.ADB_PORT, kp, command)
+            } catch (t: Throwable) {
+                last = t
+                AppLog.w("ADB 命令第 ${i + 1} 次失败: ${t.message}")
+                if (i < ADB_RETRY_TIMES - 1) Thread.sleep(ADB_RETRY_DELAY_MS)
+            }
+        }
+        throw last ?: IllegalStateException("ADB 命令失败")
+    }
+
+    private const val VERIFY_TIMES = 6
+    private const val VERIFY_INTERVAL_MS = 800L
+    private const val ADB_RETRY_TIMES = 3
+    private const val ADB_RETRY_DELAY_MS = 900L
 }

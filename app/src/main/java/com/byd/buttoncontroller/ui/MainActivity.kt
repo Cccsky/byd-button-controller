@@ -13,7 +13,9 @@ import com.byd.buttoncontroller.service.KeyMapAccessibilityService
 import com.byd.buttoncontroller.service.KeepAliveService
 import com.byd.buttoncontroller.util.AccessibilityUtil
 import com.byd.buttoncontroller.util.AppLog
+import com.byd.buttoncontroller.util.AuthRepairer
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 主界面：展示无障碍服务状态、通知使用权状态 + 7 条映射的开关列表。
@@ -50,7 +52,21 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnEnableAccessibility.setOnClickListener {
-            AccessibilityUtil.openAccessibilitySettings(this)
+            // 一键修复：权限链路（写安全设置 / ADB）自动恢复授权；失败再引导去系统设置
+            binding.btnEnableAccessibility.isEnabled = false
+            binding.statusText.text = "正在自动修复授权…"
+            lifecycleScope.launch {
+                val result = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    AuthRepairer.repair(applicationContext)
+                }
+                if (!result.ok) {
+                    AppLog.w("主界面一键修复失败: ${result.message}")
+                    AccessibilityUtil.openAccessibilitySettings(this@MainActivity)
+                }
+                refreshAccessibilityStatus()
+                refreshNotifListenerStatus()
+                binding.btnEnableAccessibility.isEnabled = true
+            }
         }
 
         binding.btnEnableNotifListener.setOnClickListener {

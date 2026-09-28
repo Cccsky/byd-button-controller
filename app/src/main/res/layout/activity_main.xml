@@ -50,7 +50,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:text="去开启无障碍服务" />
+                android:text="一键修复授权" />
 
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
